@@ -1,0 +1,20 @@
+name: AHShop
+version: 1.0.0
+main: de.ahshop.AHShop
+api-version: '26.1'
+depend: [Vault]
+description: Block-Shop per /ah mit Doppelkisten-GUI und Vault-Geld
+
+commands:
+  ah:
+    description: Oeffnet den Block-Shop
+    usage: /ah <block> [stack|shulker]
+    permission: ahshop.use
+
+permissions:
+  ahshop.use:
+    description: Erlaubt /ah
+    default: true
+  ahshop.reload:
+    description: Erlaubt /ah reload (Preisliste neu laden)
+    default: op

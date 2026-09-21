@@ -1,0 +1,13 @@
+# Format: MATERIAL: Preis pro Stueck (ein Block/Item)
+# Diese Datei durch die komplette Preisliste ersetzen und danach /ah reload ausfuehren.
+DIRT: 50
+STONE: 75
+COBBLESTONE: 100
+OAK_LOG: 300
+OAK_PLANKS: 75
+DIAMOND: 5500
+DIAMOND_BLOCK: 50000
+IRON_BLOCK: 22000
+GOLD_BLOCK: 45000
+EMERALD_BLOCK: 100000
+NETHERITE_BLOCK: 36000000
