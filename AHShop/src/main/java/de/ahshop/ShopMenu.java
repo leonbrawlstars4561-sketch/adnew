@@ -27,8 +27,8 @@ public final class ShopMenu implements InventoryHolder {
 
     private static final int SIZE = 54;
     private static final int SHULKER_SLOTS = 27;
-    private static final DecimalFormat MONEY =
-            new DecimalFormat("#,##0.##", DecimalFormatSymbols.getInstance(Locale.GERMANY));
+    /** Einheiten wie im DonutSMP-Stil: 1k = 1.000, 1m = 1.000.000, 1b, 1t. */
+    private static final String[] SUFFIXES = {"", "k", "m", "b", "t"};
 
     private final Material material;
     private final Variant variant;
@@ -76,8 +76,34 @@ public final class ShopMenu implements InventoryHolder {
         return Component.translatable(material);
     }
 
+    /**
+     * Kurzformat: 100000000 -> "100m", 1500000 -> "1.5m", 2500 -> "2.5k", 950 -> "950".
+     * Gerundet wird auf maximal 1 Nachkommastelle, ueberfluessige Nullen entfallen.
+     */
     public static String formatMoney(double amount) {
-        return MONEY.format(amount);
+        if (Double.isNaN(amount) || Double.isInfinite(amount)) {
+            return "0";
+        }
+        if (amount < 0) {
+            return "-" + formatMoney(-amount);
+        }
+
+        int tier = 0;
+        double value = amount;
+        while (value >= 1000 && tier < SUFFIXES.length - 1) {
+            value /= 1000;
+            tier++;
+        }
+
+        // Auf 1 Nachkommastelle runden; 999.999k wird dabei zu 1m statt "1000k"
+        value = Math.round(value * 10.0) / 10.0;
+        if (value >= 1000 && tier < SUFFIXES.length - 1) {
+            value /= 1000;
+            tier++;
+        }
+
+        DecimalFormat format = new DecimalFormat("0.#", DecimalFormatSymbols.getInstance(Locale.US));
+        return format.format(value) + SUFFIXES[tier];
     }
 
     /** Das Item, das der Spieler wirklich bekommt. */
