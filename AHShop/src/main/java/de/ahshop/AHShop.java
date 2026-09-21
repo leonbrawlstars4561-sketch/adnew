@@ -45,6 +45,8 @@ public final class AHShop extends JavaPlugin implements TabExecutor {
             saveResource("prices.txt", false);
         }
         loadPrices();
+        getLogger().info("Preisformat-Test: 36000000 -> " + ShopMenu.formatMoney(36000000)
+                + " (soll: 36m)");
 
         PluginCommand command = getCommand("ah");
         if (command != null) {
