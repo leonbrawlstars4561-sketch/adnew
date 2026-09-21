@@ -22,7 +22,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -102,11 +104,7 @@ public final class AHShop extends JavaPlugin implements TabExecutor {
                 continue;
             }
 
-            Material material = Material.matchMaterial(key);
-            if (material == null && key.startsWith("BLOCK_OF_")) {
-                // z.B. BLOCK_OF_RAW_IRON -> RAW_IRON_BLOCK
-                material = Material.matchMaterial(key.substring("BLOCK_OF_".length()) + "_BLOCK");
-            }
+            Material material = resolveMaterial(key);
             if (material == null) {
                 unknown.add(key);
                 continue;
@@ -124,6 +122,87 @@ public final class AHShop extends JavaPlugin implements TabExecutor {
         if (!unknown.isEmpty()) {
             getLogger().warning("Unbekannte Materialien (uebersprungen): " + unknown);
         }
+    }
+
+    /** Sortierte Wortliste -> Material, damit die Reihenfolge der Woerter egal ist. */
+    private static Map<String, Material> wordLookup;
+
+    /** Sonderfaelle, bei denen der Spielname stark vom Materialnamen abweicht. */
+    private static final Map<String, String> ALIASES = new HashMap<>();
+
+    static {
+        ALIASES.put(normalize("redstone dust"), "REDSTONE");
+        ALIASES.put(normalize("nether quartz"), "QUARTZ");
+        ALIASES.put(normalize("monster spawner"), "SPAWNER");
+        ALIASES.put(normalize("steak"), "COOKED_BEEF");
+    }
+
+    /** Grossbuchstaben, ohne "minecraft:", ohne "of"/"the", Woerter alphabetisch sortiert. */
+    private static String normalize(String raw) {
+        String s = raw.toUpperCase(Locale.ROOT).trim();
+        if (s.startsWith("MINECRAFT:")) {
+            s = s.substring("MINECRAFT:".length());
+        }
+        List<String> words = new ArrayList<>();
+        for (String w : s.split("[^A-Z0-9]+")) {
+            if (!w.isEmpty() && !w.equals("OF") && !w.equals("THE")) {
+                words.add(w);
+            }
+        }
+        Collections.sort(words);
+        return String.join("_", words);
+    }
+
+    private static Map<String, Material> wordLookup() {
+        if (wordLookup == null) {
+            Map<String, Material> map = new HashMap<>();
+            for (Material m : Material.values()) {
+                if (m.name().startsWith("LEGACY_") || !m.isItem() || m.isAir()) {
+                    continue;
+                }
+                map.putIfAbsent(normalize(m.name()), m);
+            }
+            wordLookup = map;
+        }
+        return wordLookup;
+    }
+
+    /**
+     * Wandelt einen beliebigen Namen in ein Material um. Geht mit:
+     * normalen Namen (DIAMOND_BLOCK, diamond block, diamond-block, minecraft:diamond_block),
+     * beliebiger Wortreihenfolge (block diamond) und "Block of X"
+     * (BLOCK OF NETHERITE -> NETHERITE_BLOCK, BLOCK OF LAPIS LAZULI -> LAPIS_BLOCK).
+     */
+    private static Material resolveMaterial(String raw) {
+        String key = raw.trim().toUpperCase(Locale.ROOT).replace(' ', '_').replace('-', '_');
+
+        // 1) exakter Name
+        Material material = Material.matchMaterial(key);
+        if (material != null) {
+            return material;
+        }
+
+        // 2) "Block of X": X_BLOCK, sonst schrittweise letzte Woerter von X weglassen
+        if (key.startsWith("BLOCK_OF_")) {
+            String[] words = key.substring("BLOCK_OF_".length()).split("_");
+            for (int n = words.length; n >= 1; n--) {
+                material = Material.matchMaterial(String.join("_", Arrays.copyOfRange(words, 0, n)) + "_BLOCK");
+                if (material != null) {
+                    return material;
+                }
+            }
+        }
+
+        // 3) Wortreihenfolge/Schreibweise egal
+        String normalized = normalize(raw);
+        material = wordLookup().get(normalized);
+        if (material != null) {
+            return material;
+        }
+
+        // 4) Sonderfaelle
+        String alias = ALIASES.get(normalized);
+        return alias == null ? null : Material.matchMaterial(alias);
     }
 
     // ------------------------------------------------------------------ Command
@@ -163,7 +242,7 @@ public final class AHShop extends JavaPlugin implements TabExecutor {
         }
 
         String name = String.join("_", Arrays.copyOfRange(args, 0, end)).toUpperCase(Locale.ROOT);
-        Material material = Material.matchMaterial(name);
+        Material material = resolveMaterial(name);
         Double unitPrice = material == null ? null : prices.get(material);
         if (material == null || unitPrice == null) {
             player.sendMessage(Component.text("Unbekannter Block oder kein Preis hinterlegt: "
@@ -180,24 +259,11 @@ public final class AHShop extends JavaPlugin implements TabExecutor {
         return true;
     }
 
+    /** Keine Tab-Vorschlaege (weder stack/shulker noch Spielernamen). */
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
                                       @NotNull String alias, @NotNull String[] args) {
-        String prefix = args[args.length - 1].toLowerCase(Locale.ROOT);
-        List<String> result = new ArrayList<>();
-        if (args.length == 1) {
-            if ("reload".startsWith(prefix) && sender.hasPermission("ahshop.reload")) {
-                result.add("reload");
-            }
-            result.add("<search>");
-        } else {
-            for (String s : List.of("stack", "shulker")) {
-                if (s.startsWith(prefix)) {
-                    result.add(s);
-                }
-            }
-        }
-        return result;
+        return Collections.emptyList();
     }
 
     // ------------------------------------------------------------------ Kauf
